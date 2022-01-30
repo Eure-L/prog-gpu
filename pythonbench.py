@@ -7,7 +7,7 @@ import sys
 import argparse
 
 
-
+LABEL =None
 KERNEL="dgemm"
 VERSION="seq"
 datafile = None
@@ -23,6 +23,7 @@ argv = str(sys.argv)
 parser = argparse.ArgumentParser()
 parser.add_argument('-c',"--cercles",help="nombre de cercles à générer")
 parser.add_argument('-k',"--kernel",help="kernels a faire tourner")
+parser.add_argument('-lb',"--label",help="label a ajouter")
 
 args = parser.parse_args()
 print(args)
@@ -32,6 +33,8 @@ if(args.cercles != None):
     print(args.cercles)
     if c.isdigit():
         c=int(c)
+        C=c+1
+        p=100
     else:
         c=c.split(':')
         C=int(c[1])
@@ -45,18 +48,16 @@ if(args.kernel != None):
     KERNEL=(args.kernel)
 kernels = KERNEL.split(",")
 
+if(args.label != None):
+    LABEL=(args.label)
+
 
 FILE="cercles.csv"
 ### Initialisation des fichiers / repertoires
-if(not(os.path.exists("data"))):
-    try:
-        os.mkdir("data/")
-    except:
-        pass
 
 if (not(os.path.isfile(FILE))):
     datafile = open(FILE, 'a')
-    print("kernel;cercles;temps;",file=datafile)
+    print("kernel;cercles;temps;label;",file=datafile)
 
 else:
     datafile = open(FILE, 'a')
@@ -76,16 +77,18 @@ def run(k,cercles):
     
     print(perf)
 
-    data_line = k+';'+str(cercles)+';'+str(perf)
+    data_line = k+';'+str(cercles)+';'+str(perf)+";"+str(LABEL)
     print(data_line,file=datafile)
 
 #########
 print("ok\n")
 print(kernels)
 range(c,C,p)
-
+tmp = c
 print("RUNNING")
+
 for k in kernels:
+    c = tmp
     for c in range(c,C,p):
         print(c)
         print(C)

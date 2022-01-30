@@ -23,3 +23,4 @@
 
 
 #endif // __CUDA_SAFE_CALL_H_
+

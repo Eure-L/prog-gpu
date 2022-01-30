@@ -1,4 +1,4 @@
-all: render omp opti  coalesced vectorized cuda
+all: render omp opti  coalesced vectorized cuda cuda_2 acc
 
 render: render.c
 	gcc -Wall render.c -o render -O3 -lm
@@ -18,6 +18,12 @@ coalesced: render_coalesced.c
 vectorized: render_vectorized.c
 	gcc  -Wall render_vectorized.c -o vectorized -O3 -lm -march=native
 
+cuda_2: render_cuda_2.cu
+	nvcc render_cuda_2.cu -o cuda_2
+
+acc : render_acc.c
+	pgcc render_acc.c -o acc
+
 
 run: render
 	./render 1000
@@ -29,6 +35,6 @@ run.long: render
 	./render 1000000
 
 clean:
-	rm -f render render_omp vectorized opti cuda omp coalesced
+	rm -f render render_omp vectorized opti cuda omp coalesced acc cuda_2
 	rm -f *.ppm
 	rm -f *.png

@@ -195,7 +195,8 @@ int main(int argc, char **argv)
 				__m256 rAlpha = _mm256_mul_ps(alphaV,rv);
 				__m256 gAlpha = _mm256_mul_ps(alphaV,gv);
 				__m256 bAlpha = _mm256_mul_ps(alphaV,bv);
-
+                
+                // la vectorisation est pas tres simple
 				imgRv =  _mm256_add_ps( _mm256_mul_ps( _mm256_and_ps(_mm256_xor_ps(mask,rAlpha),rAlpha), rv) , _mm256_mul_ps(mAlpha, imgRv));
 				imgGv =  _mm256_add_ps( _mm256_mul_ps( _mm256_and_ps(_mm256_xor_ps(mask,gAlpha),gAlpha), gv) , _mm256_mul_ps(mAlpha, imgGv));
 				imgRv =  _mm256_add_ps( _mm256_mul_ps( _mm256_and_ps(_mm256_xor_ps(mask,rAlpha),bAlpha), bv) , _mm256_mul_ps(mAlpha, imgBv));

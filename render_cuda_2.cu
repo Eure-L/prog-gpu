@@ -5,7 +5,7 @@
 #include <math.h> // pour le calcul d'exponentielle lorsque l'on génère le probleme aléatoire
 #include "cuda_safe_call.h"
 
-// Ne pas dépasser 1024 en width
+//ne pas dépasser 1024 en width
 #define WIDTH 800
 #define HEIGHT 800
 
@@ -59,45 +59,43 @@ float default_circles[] = {1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  0.0, 0.0, 1.0,
 											0.25, 0.5, 0.75,
 											0.5, 0.5, 0.5};
 
-__global__ void computeImage(float * image, float *  circles, int ncircles,
-								float xmin,float xmax,float ymin, float ymax, float dx,float dy){
+
+__global__ void computeImage(float * image, float *  circles, const int width, const int height, int ncircles,
+								float xmin,float xmax,float ymin, float ymax, float dx,float dy, 
+								int xfloor, int xceil, int yfloor, int yceil,
+								int circle,float xc, float yc, float rc){
 	//int index = threadIdx.x + threadIdx.y * blockDim.x;
+	int index = (blockIdx.x + yfloor) * width + (threadIdx.x + xfloor);
 	
+
+	float rc2 = rc*rc;
+
+	// printf("%f, %f, %f , %f \n",xc,yc,rc,rc2);
+
+	// Coordonnées du pixel
+	int x = threadIdx.x + xfloor;
+	int y = blockIdx.x + yfloor;
+	float xpos = xmin + x * dx;
+	float ypos = ymin + y * dy;
+	float dist2 = (((xpos-xc)*(xpos-xc) + (ypos-yc)*(ypos-yc)));
+
+	// Le pixel est dans le cercle si la distance entre le
+	// centre et le pixel est inférieure au rayon
 	
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
-	for (int c = 0; c < ncircles; c++)
+	if (dist2 <= rc2)
 	{
-		
-		float xc = circles[c + cX * ncircles];
-		float yc = circles[c + cY * ncircles];
-		float rc = circles[c + cRadius * ncircles];
-		float rc2 = rc*rc;
+		// Caractéristiques du disque
+		float alpha = circles[circle+cAlpha*ncircles];
+		float r 	= circles[circle+cR*ncircles];
+		float g 	= circles[circle+cG*ncircles];
+		float b 	= circles[circle+cB*ncircles];
 
-
-		// Coordonnées du pixel
-		int x = threadIdx.x;
-		int y = blockIdx.x;
-		float xpos = xmin + x * dx;
-		float ypos = ymin + y * dy;
-		float dist2 = (((xpos-xc)*(xpos-xc) + (ypos-yc)*(ypos-yc)));
-
-		// Le pixel est dans le cercle si la distance entre le
-		// centre et le pixel est inférieure au rayon
-		
-		if (dist2 <= rc2)
-		{
-			// Caractéristiques du disque
-			float alpha = circles[c+cAlpha*ncircles];
-			float r 	= circles[c+cR*ncircles];
-			float g 	= circles[c+cG*ncircles];
-			float b 	= circles[c+cB*ncircles];
-
-			// Operation de fusion des couleurs
-			image[index] 				= alpha * r + (1.0f - alpha) * image[index];
-			image[index+imgSTRIDE]	 	= alpha * g + (1.0f - alpha) * image[index+imgSTRIDE];
-			image[index+imgSTRIDE*2] 	= alpha * b + (1.0f - alpha) * image[index+imgSTRIDE*2];
-		}
+		// Operation de fusion des couleurs
+		image[index] 				= alpha * r + (1.0f - alpha) * image[index];
+		image[index+imgSTRIDE]	 	= alpha * g + (1.0f - alpha) * image[index+imgSTRIDE];
+		image[index+imgSTRIDE*2] 	= alpha * b + (1.0f - alpha) * image[index+imgSTRIDE*2];
 	}
+	
 }
 
 int main(int argc, char **argv)
@@ -161,6 +159,8 @@ int main(int argc, char **argv)
 	struct timeval start, finish;
 	unsigned long long tstart, tfinish;
 	gettimeofday(&start, NULL);
+
+	// Allocating Device memory
 	float * d_image;
 	float * d_circles;
 	cudaMalloc((float **)&d_image,3*width*height*sizeof(float));
@@ -168,8 +168,31 @@ int main(int argc, char **argv)
 	CUDA_SAFE_CALL(cudaMemcpy(d_image, image, 3 * width * height * sizeof(float),cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(d_circles, circles, 7 * ncircles * sizeof(float),cudaMemcpyHostToDevice));
 	
-	computeImage<<<HEIGHT,WIDTH>>>(d_image,d_circles,ncircles,xmin,xmax,ymin,ymax,dx,dy);
-	//printf("kernel ok\n");
+	int c;
+
+	// On itere sur les disques
+	for (c = 0; c < ncircles; c++)
+	{
+		float xc = circles[c + cX * ncircles];
+		float yc = circles[c + cY * ncircles];
+		float rc = circles[c + cRadius * ncircles];
+		// Au lieu de cherche si TOUS les pixels de l'image ont une intersection avec le cercle
+		// On va chercher seulement si les pixels du carre contenant le cercle ont une intersection avec
+		// Pixels y englobant le cercles
+		int yfloor  	= (yc - rc < 0) ? 0 : (yc - rc) * height;
+		int yceil 		= (yc + rc > 1) ? height : (yc + rc) * height;
+		// Pixels X englobant le xercle
+		int xfloor  	= (xc - rc < 0) ? 0 : (xc - rc) * width;
+		int xceil 		= (xc + rc > 1) ? width : (xc + rc) * width;
+ 
+		
+		computeImage<<<yceil-yfloor,xceil-xfloor>>>
+			(d_image,d_circles,width,height,ncircles,
+			xmin,xmax,ymin,ymax,dx,dy,xfloor,xceil,yfloor,yceil,
+			c,xc,yc,rc);
+		cudaDeviceSynchronize();
+	}
+	
 
 	CUDA_SAFE_CALL(cudaDeviceSynchronize()); //Verifier que le code se soit bien lancé sur GPU
 	CUDA_SAFE_CALL(cudaMemcpy(image,d_image,3*width*height*sizeof(float),cudaMemcpyDeviceToHost));

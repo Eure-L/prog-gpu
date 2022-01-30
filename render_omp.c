@@ -123,7 +123,7 @@ int main(int argc, char **argv)
 	int c;
 
 	// On itere sur les disques
-	#pragma omp parallel for schedule(dynamic,2) shared(image)
+	
 	for (c = 0; c < ncircles; c++)
 	{
 		float xc = circles[c].x;
@@ -145,6 +145,7 @@ int main(int argc, char **argv)
 		// printf("%d - %d | %d - %d\n",xfloor,xceil,yfloor,yceil);
 
 		// On itere sur les pixels
+		#pragma omp parallel for collapse(2) schedule(dynamic,2) shared(image)
 		for (y = yfloor ; y < yceil; y++)
 		for (x = xfloor; x < xceil;  x++)
 		{
